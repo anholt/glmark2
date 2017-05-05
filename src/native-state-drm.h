@@ -77,6 +77,7 @@ private:
     void cleanup();
 
     int fd_;
+    int gbm_fd_;
     drmModeRes* resources_;
     drmModeConnector* connector_;
     drmModeEncoder* encoder_;

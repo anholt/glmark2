@@ -22,6 +22,7 @@
  *  Jesse Barker
  *  Alexandros Frantzis
  */
+#include <unistd.h>
 #include "native-state-drm.h"
 #include "log.h"
 
@@ -157,8 +158,20 @@ NativeStateDRM::fb_get_from_bo(gbm_bo* bo)
     unsigned int width = gbm_bo_get_width(bo);
     unsigned int height = gbm_bo_get_height(bo);
     unsigned int stride = gbm_bo_get_stride(bo);
-    unsigned int handle = gbm_bo_get_handle(bo).u32;
+    unsigned int prime_fd = gbm_bo_get_fd(bo);
     unsigned int fb_id(0);
+
+    uint32_t handle;
+    int ret = drmPrimeFDToHandle(fd_, prime_fd, &handle);
+    if (ret) {
+	    fprintf(stderr,
+		    "Failed to import prime fd to KMS: %s\n",
+		    strerror(errno));
+	    free(fb);
+	    return NULL;
+    }
+    close(prime_fd);
+
     int status = drmModeAddFB(fd_, width, height, 24, 32, stride, handle, &fb_id);
     if (status < 0) {
         Log::error("Failed to create FB: %d\n", status);
@@ -177,7 +190,7 @@ NativeStateDRM::fb_get_from_bo(gbm_bo* bo)
 bool
 NativeStateDRM::init_gbm()
 {
-    dev_ = gbm_create_device(fd_);
+    dev_ = gbm_create_device(gbm_fd_);
     if (!dev_) {
         Log::error("Failed to create GBM device\n");
         return false;
@@ -205,7 +218,8 @@ NativeStateDRM::init()
         "radeon",
         "vmgfx",
         "omapdrm",
-        "exynos"
+        "exynos",
+	"pl111",
     };
 
     unsigned int num_modules(sizeof(drm_modules)/sizeof(drm_modules[0]));
@@ -217,6 +231,12 @@ NativeStateDRM::init()
         }
         Log::debug("Opened DRM module '%s'\n", drm_modules[m]);
         break;
+    }
+
+    gbm_fd_ = drmOpen("vc4", 0);
+    if (gbm_fd_ < 0) {
+	    Log::error("Failed to open vc4\n");
+	    return false;
     }
 
     if (fd_ < 0) {
