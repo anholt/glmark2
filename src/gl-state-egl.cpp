@@ -428,6 +428,7 @@ GLStateEGL::gotValidDisplay()
     if (egl_display_)
         return true;
 
+#if defined(PFNEGLGETPLATFORMDISPLAYEXTPROC)
     char const * __restrict const supported_extensions =
         eglQueryString(EGL_NO_DISPLAY, EGL_EXTENSIONS);
 
@@ -453,6 +454,7 @@ GLStateEGL::gotValidDisplay()
     {
         Log::debug("eglGetPlatformDisplayEXT() seems unsupported\n");
     }
+#endif
 
     /* Just in case get_platform_display failed... */
     if (!egl_display_) {
